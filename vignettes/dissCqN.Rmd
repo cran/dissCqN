@@ -1,0 +1,83 @@
+---
+title: "dissCqN"
+author: "Mark V. Murphy"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{dissCqN}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+bibliography: references.bib
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+Let's use `dissCqN` to calculate compositional dissimilarity for a dataset of tree species counts from tropical forests of Barro Colorado Island, Panama [@conditBetaDiversityTropicalForest2002], [provided with the `vegan` package](https://rdrr.io/cran/vegan/man/BCI.html). There are 50 sampled 1-hectare forest plots (rows) and 225 total tree species (columns). Let's take a look at a sample:
+
+```{r}
+# install.packages(c("dissCqN", "vegan"))
+library(dissCqN)
+data(BCI, package = "vegan")
+rownames(BCI) <- paste0("plot_", 1:nrow(BCI))
+knitr::kable(
+  BCI[sample(1:nrow(BCI), 5), 
+      sample(1:ncol(BCI), 5)]
+)
+```
+
+We can calculate multiple-assemblage dissimilarity for the forest plots for, say, orders *q* = 0-6:
+
+```{r}
+q <- 0:6
+(BCI.diss.mult <- dissCqN(BCI, q))
+```
+
+And plot a dissimilarity profile for *q* [@jostCompositionalSimilarityBeta2011]:
+
+```{r}
+par(bg = "#303030", fg = "#cccccc")  # dark plot scheme
+plot(q, BCI.diss.mult, xlab = expression(italic("q")), ylab = "Dissimilarity", 
+     col.axis = "#cccccc", col.lab = "#cccccc")
+lines(q, BCI.diss.mult)
+```
+
+We can see that when only presence-absence of trees is considered (*q* = 0, or Sørensen dissimilarity), dissimilarity is very low (0.03) -- implying no major difference in species composition between the sampled assemblages. When tree abundance is taken into account however, dissimilarity steadily increases through the values of *q* as changes in relative abundance of common species have increasing influence on community difference (reaching \>0.99 for *q* = 6). Plotting such profiles can help to illustrate the dominance of common species in the community, with steeper increases associated with higher dominance. If under-sampling of the community is suspected, dissimilarity for *q* \> 0 or *q* \> 1 is likely to be more reliable for assessing difference, as the common species are probably still sampled relatively accurately using the abundance-based measures.
+
+What about pairwise dissimilarity? Simply set `pairwise = TRUE`:
+
+```{r}
+system.time(
+  BCI.diss.pair <- dissCqN(BCI, pairwise = TRUE)
+)
+```
+
+This generates a symmetrical pairwise dissimilarity matrix for each value of *q* (0--2 only), returned in a list:
+
+```{r}
+lapply(BCI.diss.pair, function(i) i[1:5, 1:5])
+```
+
+Note that another way to calculate multiple-assemblage dissimilarity might be to take the means of these pairwise matrices (omitting self-comparisons):
+
+```{r}
+sapply(BCI.diss.pair, function(i) {
+  sum(i) / (prod(dim(i)) - dim(i)[1])
+})
+```
+
+These values are biased however, as they never take into account species shared by more than two assemblages, and there is also the problem of covariance between the pairwise comparisons [@diserudMultiplesiteSimilarityMeasure2007]. Multiple-assemblage measures should generally be preferred when assessing overall community difference for randomly-sampled assemblages. However, when assessing change across ordered assemblages, for example along geographic or environmental gradients, pairwise comparisons can be more appropriate.
+
+Subsets of assemblages can also be compared pairwise (using names or indices), if only some comparisons are of interest:
+
+```{r}
+dissCqN(BCI, pairwise = TRUE, compare.sub = list(1:2, 3:5))
+```
+
+This could potentially save time if the total number of assemblages in the dataset is very large.
+
+#### References
